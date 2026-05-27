@@ -1,0 +1,1859 @@
+================================================================================
+DETAILED LIBRARY AND TECHNIQUE DOCUMENTATION
+CADI-AI Modified YOLO Project
+================================================================================
+
+This document explains every library, function, method, and technique used in 
+the project. Each entry includes:
+1. What it is
+2. Why it's used
+3. Where it's used in the project
+4. How to use it (with examples)
+
+================================================================================
+SECTION 1: CORE LIBRARIES
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+1.1 PyTorch (torch)
+────────────────────────────────────────────────────────────────────────────
+
+WHAT IS IT?
+PyTorch is a deep learning framework (library) for building and training neural 
+networks. It provides:
+- Tensor operations (like NumPy but on GPU)
+- Automatic differentiation (backpropagation)
+- Neural network modules and layers
+- Optimization algorithms
+- GPU acceleration
+
+Website: pytorch.org
+Developed by: Meta AI Research
+
+WHY USE IT?
+- Industry standard for deep learning research
+- Easy to debug (eager execution by default)
+- Flexible architecture design
+- Excellent GPU support
+- Large community and documentation
+- Integrates well with other libraries
+
+CORE COMPONENTS:
+
+torch.nn (Neural Network Module):
+  - Container for neural network layers
+  - Base class for building models
+  
+  Example:
+    import torch.nn as nn
+    
+    class MyModel(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc = nn.Linear(10, 5)
+        
+        def forward(self, x):
+            return self.fc(x)
+
+torch.optim (Optimization):
+  - SGD: Stochastic Gradient Descent with momentum
+  - Adam: Adaptive learning rate optimizer
+  - Others: AdamW, RMSprop, etc.
+  
+  Example:
+    optimizer = torch.optim.SGD(
+        model.parameters(),
+        lr=0.001,
+        momentum=0.937
+    )
+
+torch.Tensor:
+  - Multi-dimensional array
+  - Fundamental data structure
+  - Supports GPU acceleration
+  
+  Example:
+    x = torch.tensor([1, 2, 3])  # CPU
+    y = torch.cuda.FloatTensor([1, 2, 3])  # GPU
+
+torch.cuda:
+  - GPU acceleration interface
+  - Check GPU availability
+  - Move data/models to GPU
+  
+  Example:
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = model.to(device)
+    x = x.to(device)
+
+WHERE USED IN PROJECT?
+- Kaggle training notebook: Model definition, training loop
+- Local inference: Model loading, inference execution
+- Backbone architecture: Tensor operations
+
+KEY FUNCTIONS IN PROJECT:
+
+torch.manual_seed(42):
+  Sets random seed for reproducibility
+  Why: Ensures same results across runs
+  Usage: At the start of training/inference
+
+torch.cuda.is_available():
+  Checks if GPU is available
+  Why: Decide device (cuda vs cpu)
+  Usage: In initialization
+
+model.train() / model.eval():
+  Sets model to training or evaluation mode
+  Why: Different behavior for dropout, batch norm
+  Usage: Before training loop and validation
+
+torch.no_grad():
+  Disables gradient calculation
+  Why: Faster inference, saves memory
+  Usage: Inside validation/inference loops
+
+torch.nn.utils.clip_grad_norm_():
+  Clips gradient norm to prevent explosion
+  Why: Stabilize training with large gradients
+  Usage: After loss.backward()
+
+────────────────────────────────────────────────────────────────────────────
+1.2 Ultralytics YOLO
+────────────────────────────────────────────────────────────────────────────
+
+WHAT IS IT?
+The Ultralytics YOLO package provides an easy-to-use implementation of YOLO 
+object detection models (v5, v8, etc.). It abstracts away complexity and 
+provides high-level APIs.
+
+Website: github.com/ultralytics/ultralytics
+Creator: Ultralytics LLC
+
+WHY USE IT?
+- Easy to train YOLO models
+- Pre-trained weights available
+- Built-in training pipeline
+- Handles data loading, augmentation, validation automatically
+- Professional quality code
+- Active maintenance
+- Standard in industry
+
+KEY CLASSES:
+
+from ultralytics import YOLO
+
+YOLO Class:
+  Main class for all YOLO operations
+  
+  Methods:
+  - __init__(model_path): Load model
+  - train(): Start training
+  - val(): Run validation
+  - predict(source): Run inference
+  - to(device): Move to device
+
+Example:
+  from ultralytics import YOLO
+  
+  # Load pretrained model
+  model = YOLO('yolov8m.pt')
+  
+  # Training
+  results = model.train(
+      data='data.yaml',
+      epochs=50,
+      imgsz=640,
+      batch=16
+  )
+  
+  # Validation
+  metrics = model.val(data='data.yaml')
+  
+  # Inference
+  results = model.predict(source='image.jpg')
+
+WHERE USED IN PROJECT?
+
+Kaggle Training Notebook:
+  - Load baseline model: baseline_model = YOLO('yolov8m.pt')
+  - Training: modified_model.base_model.train(...)
+  - Evaluation: metrics = model.val(...)
+
+Local Inference Script:
+  - Load weights: model = YOLO(weights_path)
+  - Inference: results = model.predict(source=image_path)
+
+KEY FEATURES USED:
+
+Model Files:
+  'yolov8n.pt': Nano (smallest, fastest)
+  'yolov8s.pt': Small
+  'yolov8m.pt': Medium (balanced) - USED IN PROJECT
+  'yolov8l.pt': Large
+  'yolov8x.pt': Extra Large (largest, slowest)
+
+Training Parameters:
+  data: Path to dataset config (data.yaml)
+  epochs: Number of training epochs
+  imgsz: Input image size (640x640 standard)
+  batch: Batch size per GPU
+  device: GPU device ID or list
+  patience: Early stopping patience
+  save: Whether to save checkpoints
+  project: Directory to save results
+  name: Experiment name
+
+Results Object:
+  Returned from train(), val(), predict()
+  
+  Contains:
+  - results_dict: Dictionary of metrics
+  - boxes: Detected bounding boxes
+  - conf: Confidence scores
+  - cls: Class predictions
+  - orig_img: Original image
+  
+  Example:
+    results = model.predict(source='image.jpg')
+    result = results[0]
+    
+    # Access predictions
+    for box in result.boxes:
+        class_id = int(box.cls[0])
+        confidence = float(box.conf[0])
+        bbox = box.xyxy[0]  # [x1, y1, x2, y2]
+
+────────────────────────────────────────────────────────────────────────────
+1.3 OpenCV (cv2)
+────────────────────────────────────────────────────────────────────────────
+
+WHAT IS IT?
+OpenCV (Open Source Computer Vision Library) provides computer vision algorithms 
+and image processing functions. Handles:
+- Image I/O (reading/writing)
+- Image manipulation and transformation
+- Drawing annotations
+- Image filtering and enhancement
+- Feature detection
+
+Website: opencv.org
+
+WHY USE IT?
+- Standard for image processing
+- Fast (optimized C++ backend)
+- Widely used in industry
+- Good documentation
+- Handles various image formats
+- GPU acceleration available
+
+KEY FUNCTIONS USED IN PROJECT:
+
+cv2.imread(filepath):
+  Reads image file from disk
+  
+  What: Loads image as NumPy array
+  Returns: Array of shape (height, width, 3) for RGB
+  
+  Example:
+    image = cv2.imread('photo.jpg')
+    # Note: OpenCV uses BGR, not RGB!
+
+cv2.imwrite(filepath, image):
+  Saves image array to file
+  
+  What: Writes image to disk
+  Saves in PNG, JPG, etc. format
+  
+  Example:
+    cv2.imwrite('output.jpg', annotated_image)
+
+cv2.cvtColor(image, code):
+  Converts image between color spaces
+  
+  Common conversions:
+    cv2.COLOR_BGR2RGB: OpenCV (BGR) to standard (RGB)
+    cv2.COLOR_RGB2BGR: Reverse
+    cv2.COLOR_BGR2GRAY: To grayscale
+  
+  Why: OpenCV uses BGR, matplotlib uses RGB
+  
+  Example:
+    rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
+
+cv2.rectangle(image, pt1, pt2, color, thickness):
+  Draws rectangle on image
+  
+  What: Annotates bounding box on image
+  
+  Example:
+    cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+cv2.putText(image, text, org, font, scale, color):
+  Draws text on image
+  
+  What: Add labels to image
+  
+  Example:
+    cv2.putText(image, 'Disease', (x1, y1-10), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
+
+WHERE USED IN PROJECT?
+
+Local Inference Script:
+  - Image I/O: cv2.imread(), cv2.imwrite()
+  - Visualization: Drawing bounding boxes
+  - Color conversion: For matplotlib display
+
+────────────────────────────────────────────────────────────────────────────
+1.4 NumPy (numpy)
+────────────────────────────────────────────────────────────────────────────
+
+WHAT IS IT?
+NumPy provides numerical computing with N-dimensional arrays and mathematical 
+functions. Foundation of scientific Python.
+
+Website: numpy.org
+
+WHY USE IT?
+- Efficient array operations
+- Mathematical functions
+- Linear algebra
+- Random number generation
+- Fast (C backend)
+- Industry standard
+
+KEY FUNCTIONS USED:
+
+np.random.seed(seed):
+  Sets random seed for reproducibility
+  
+  Example:
+    np.random.seed(42)
+    # All subsequent random operations are seeded
+
+np.array():
+  Creates array from list or tensor
+  
+  Example:
+    arr = np.array([1, 2, 3])
+
+np.zeros(), np.ones():
+  Creates arrays of zeros or ones
+  
+  Example:
+    zeros = np.zeros((5, 5))
+
+np.mean(), np.std(), np.max():
+  Statistics operations
+  
+  Example:
+    mean_val = np.mean(data)
+    std_val = np.std(data)
+
+WHERE USED IN PROJECT?
+- Data preprocessing
+- Statistics calculation
+- Array operations
+- Random number generation
+
+────────────────────────────────────────────────────────────────────────────
+1.5 Pandas (pandas)
+────────────────────────────────────────────────────────────────────────────
+
+WHAT IS IT?
+Pandas provides data manipulation and analysis tools. Works with tabular data 
+(like spreadsheets or SQL tables).
+
+Website: pandas.pydata.org
+
+WHY USE IT?
+- Easy data manipulation
+- CSV/Excel I/O
+- Data cleaning
+- Statistics calculation
+- Handles missing data
+
+KEY COMPONENTS:
+
+pd.DataFrame:
+  Tabular data structure (rows and columns)
+  
+  Example:
+    df = pd.DataFrame({
+        'metric': ['mAP', 'precision', 'recall'],
+        'baseline': [0.482, 0.712, 0.658],
+        'modified': [0.556, 0.778, 0.721]
+    })
+
+pd.read_csv():
+  Reads CSV file into DataFrame
+  
+  Example:
+    results_df = pd.read_csv('training_results.csv')
+
+df.to_csv():
+  Writes DataFrame to CSV file
+  
+  Example:
+    df.to_csv('metrics.csv', index=False)
+
+WHERE USED IN PROJECT?
+- Storing evaluation metrics
+- Comparing results between models
+- Creating result tables
+- Reading training logs
+
+────────────────────────────────────────────────────────────────────────────
+1.6 Matplotlib (matplotlib)
+────────────────────────────────────────────────────────────────────────────
+
+WHAT IS IT?
+Matplotlib is a plotting library for creating visualizations (plots, charts, 
+histograms, etc.).
+
+Website: matplotlib.org
+
+WHY USE IT?
+- Industry standard plotting library
+- Highly customizable
+- Publication-quality plots
+- Integrates well with Jupyter notebooks
+
+KEY COMPONENTS:
+
+matplotlib.pyplot (plt):
+  Simple plotting interface
+  
+  Example:
+    import matplotlib.pyplot as plt
+    
+    plt.plot([1, 2, 3], [1, 4, 9])
+    plt.xlabel('X Label')
+    plt.ylabel('Y Label')
+    plt.show()
+
+plt.figure(figsize=(width, height)):
+  Creates new figure with specific size
+  
+  Example:
+    plt.figure(figsize=(12, 8))
+
+plt.subplots(rows, cols):
+  Creates grid of subplots
+  
+  Example:
+    fig, axes = plt.subplots(2, 2)  # 2x2 grid
+    axes[0, 0].plot(x, y)
+
+plt.imshow(image):
+  Displays image
+  
+  Example:
+    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    plt.show()
+
+plt.savefig(filepath):
+  Saves plot to file
+  
+  Example:
+    plt.savefig('plot.png', dpi=300, bbox_inches='tight')
+
+WHERE USED IN PROJECT?
+- Training plots (loss, mAP over epochs)
+- Comparison plots (baseline vs modified)
+- Result visualization
+- Detection visualizations
+
+────────────────────────────────────────────────────────────────────────────
+1.7 Seaborn (seaborn)
+────────────────────────────────────────────────────────────────────────────
+
+WHAT IS IT?
+Seaborn is a statistical data visualization library built on matplotlib. Makes 
+creating attractive plots easier.
+
+Website: seaborn.pydata.org
+
+WHY USE IT?
+- Higher-level than matplotlib
+- Better default styles
+- Statistical visualization
+- Heatmaps and complex plots
+- Nice color palettes
+
+KEY FUNCTIONS:
+
+sns.heatmap():
+  Creates heatmap (confusion matrix visualization)
+  
+  Example:
+    sns.heatmap(confusion_matrix, annot=True, cmap='Blues')
+
+WHERE USED IN PROJECT?
+- Confusion matrix visualization
+- Correlation heatmaps
+- Result visualization
+
+================================================================================
+SECTION 2: SPECIALIZED LIBRARIES FOR DEEP LEARNING
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+2.1 PyYAML (yaml)
+────────────────────────────────────────────────────────────────────────────
+
+WHAT IS IT?
+YAML (YAML Ain't Markup Language) is a human-readable data serialization format.
+PyYAML is Python library to read/write YAML files.
+
+Format Example:
+  path: /path/to/dataset
+  train: images/train
+  val: images/val
+  nc: 3
+  names: ['abiotic', 'insect', 'disease']
+
+WHY USE IT?
+- Human-readable configuration files
+- YOLO standard for dataset configuration
+- Easy to parse
+- Structured format
+
+KEY FUNCTIONS:
+
+yaml.dump(data, file):
+  Writes Python dict to YAML file
+  
+  Example:
+    import yaml
+    
+    config = {
+        'path': '/dataset',
+        'nc': 3,
+        'names': ['abiotic', 'insect', 'disease']
+    }
+    
+    with open('data.yaml', 'w') as f:
+        yaml.dump(config, f)
+
+yaml.load(file):
+  Reads YAML file to Python dict
+  
+  Example:
+    with open('data.yaml', 'r') as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+
+WHERE USED IN PROJECT?
+- Creating data.yaml for YOLO training
+- Storing configuration parameters
+- YOLO dataset definition
+
+────────────────────────────────────────────────────────────────────────────
+2.2 Python Standard Libraries
+────────────────────────────────────────────────────────────────────────────
+
+import os:
+  Operating system interface
+  
+  Key functions:
+  - os.path.exists(path): Check if file/folder exists
+  - os.makedirs(path): Create directory (with parents)
+  - os.listdir(path): List directory contents
+  - os.path.join(): Join path components
+  
+  Example:
+    if not os.path.exists('results'):
+        os.makedirs('results')
+
+import sys:
+  System-specific functions
+  
+  Key functions:
+  - sys.argv: Command-line arguments
+  - sys.exit(): Exit program
+  - sys.version: Python version
+  
+  Example:
+    if len(sys.argv) < 2:
+        print("Usage: python script.py <arg>")
+        sys.exit(1)
+
+import json:
+  JSON file handling (JavaScript Object Notation)
+  Human-readable data format
+  
+  Key functions:
+  - json.dump(data, file): Write to JSON
+  - json.load(file): Read from JSON
+  
+  Example:
+    metrics = {'mAP': 0.556, 'precision': 0.778}
+    with open('metrics.json', 'w') as f:
+        json.dump(metrics, f, indent=4)
+
+import argparse:
+  Command-line argument parsing
+  
+  Creates:
+  - --help automatically
+  - Type checking
+  - Default values
+  
+  Example:
+    import argparse
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--weights', type=str, required=True)
+    parser.add_argument('--image', type=str)
+    parser.add_argument('--conf', type=float, default=0.25)
+    
+    args = parser.parse_args()
+
+import shutil:
+  File operations
+  
+  Key functions:
+  - shutil.copy(src, dst): Copy file
+  - shutil.rmtree(path): Remove directory
+  - shutil.move(src, dst): Move file
+  
+  Example:
+    shutil.copy('model.pt', 'backup.pt')
+
+import zipfile:
+  ZIP archive handling
+  
+  Example:
+    with zipfile.ZipFile('dataset.zip', 'r') as zip_ref:
+        zip_ref.extractall('dataset')
+
+import warnings:
+  Control warning messages
+  
+  Example:
+    import warnings
+    warnings.filterwarnings('ignore')  # Suppress warnings
+
+from datetime import datetime:
+  Date and time handling
+  
+  Example:
+    timestamp = datetime.now().isoformat()
+    print(f"Training started at: {timestamp}")
+
+from pathlib import Path:
+  Object-oriented path handling
+  
+  Example:
+    path = Path('/home/user/data')
+    files = list(path.glob('*.jpg'))
+
+WHERE USED IN PROJECT?
+All scripts use these for file handling, configuration, logging, and CLI.
+
+================================================================================
+SECTION 3: NEURAL NETWORK COMPONENTS
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+3.1 Basic Neural Network Layers
+────────────────────────────────────────────────────────────────────────────
+
+nn.Conv2d (Convolutional Layer):
+  
+  WHAT:
+  Applies convolutional filters to image
+  Learns feature patterns
+  
+  Parameters:
+  - in_channels: Number of input channels (3 for RGB)
+  - out_channels: Number of output channels (number of filters)
+  - kernel_size: Size of convolutional kernel (e.g., 3 for 3x3)
+  - stride: Step size of convolution
+  - padding: Zero-padding to preserve size
+  - dilation: Spacing between kernel elements (dilated conv)
+  
+  Example:
+    conv = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
+    # Takes 3-channel image, outputs 64 feature maps
+    # Using 3x3 kernel with 1-pixel padding
+  
+  Output shape:
+    Input: (batch, channels, height, width)
+    Output: (batch, out_channels, height, width)
+  
+  WHERE USED:
+  - Backbone feature extraction
+  - Modified architecture with dilated convolutions
+
+nn.BatchNorm2d (Batch Normalization):
+  
+  WHAT:
+  Normalizes feature activations within each batch
+  Stabilizes training by reducing internal covariate shift
+  
+  Parameters:
+  - num_features: Number of channels
+  - eps: Small value to prevent division by zero
+  - momentum: Momentum for running statistics
+  
+  Example:
+    bn = nn.BatchNorm2d(64)
+    x = conv(x)
+    x = bn(x)
+  
+  Benefits:
+  - Faster training
+  - Less sensitive to initialization
+  - Acts as regularization (reduces need for dropout)
+  
+  WHERE USED:
+  - After each convolution in backbone
+  - Standard practice in modern networks
+
+nn.ReLU, nn.SiLU (Activation Functions):
+  
+  WHAT:
+  Introduces non-linearity into network
+  Without activation, layers are just linear transformations
+  
+  ReLU (Rectified Linear Unit):
+    f(x) = max(0, x)
+    Simple, fast, effective
+  
+  SiLU (Sigmoid Linear Unit):
+    f(x) = x * sigmoid(x)
+    Smoother than ReLU, used in modern architectures
+    YOLO v8 uses SiLU
+  
+  Example:
+    activation = nn.ReLU(inplace=True)
+    x = activation(x)
+    
+    OR modern:
+    x = nn.SiLU()(x)
+  
+  WHY NEEDED:
+  - Enable learning non-linear relationships
+  - Without activation: f(f(f(x))) = Ax + b (still linear!)
+  
+  WHERE USED:
+  - After convolution and batch norm
+  - Core part of every modern network layer
+
+nn.Linear (Fully Connected Layer):
+  
+  WHAT:
+  Applies linear transformation: y = xW^T + b
+  
+  Parameters:
+  - in_features: Input dimension
+  - out_features: Output dimension
+  
+  Example:
+    fc = nn.Linear(256, 3)  # 256 inputs -> 3 outputs (for 3 classes)
+  
+  WHERE USED:
+  - Not used much in detection (uses convolutional heads)
+  - Used in attention mechanisms for channel recalibration
+
+nn.AdaptiveAvgPool2d (Global Average Pooling):
+  
+  WHAT:
+  Reduces spatial dimensions to 1x1
+  Averages over all spatial locations per channel
+  
+  Example:
+    pool = nn.AdaptiveAvgPool2d(1)
+    # Input: (batch, channels, height, width)
+    # Output: (batch, channels, 1, 1)
+  
+  WHERE USED:
+  - Attention mechanisms (squeeze spatial dimension)
+  - Converting spatial features to channel features
+
+nn.Sequential (Model Container):
+  
+  WHAT:
+  Container for ordered sequence of layers
+  
+  Example:
+    model = nn.Sequential(
+        nn.Conv2d(3, 64, 3, 1, 1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(inplace=True),
+        nn.Conv2d(64, 128, 3, 1, 1),
+        nn.BatchNorm2d(128),
+        nn.ReLU(inplace=True)
+    )
+    
+    output = model(input_tensor)
+  
+  Alternative: Use nn.Module and define forward() explicitly
+
+────────────────────────────────────────────────────────────────────────────
+3.2 Advanced Components Used in Modified YOLO
+────────────────────────────────────────────────────────────────────────────
+
+DILATED CONVOLUTION (Atrous Convolution):
+  
+  WHAT:
+  Convolution with gaps between kernel elements
+  Increases receptive field without increasing parameters
+  
+  Parameters:
+  - dilation=1: Standard convolution (no gaps)
+  - dilation=2: Kernel spread over 5x5 area (for 3x3 kernel)
+  - dilation=4: Kernel spread over 7x7 area
+  
+  Receptive Field Calculation:
+    RF = kernel_size + (kernel_size - 1) * (dilation - 1)
+  
+  Example:
+    # Standard 3x3: RF = 3
+    conv1 = nn.Conv2d(64, 128, 3, dilation=1)
+    
+    # Dilated 3x3 with d=2: RF = 5
+    conv2 = nn.Conv2d(64, 128, 3, dilation=2, padding=2)
+    
+    # Dilated 3x3 with d=4: RF = 7
+    conv3 = nn.Conv2d(64, 128, 3, dilation=4, padding=4)
+  
+  Visual:
+    Standard Conv (d=1):     Dilated Conv (d=2):
+    X X X                    X . X
+    X X X                    . X .
+    X X X                    X . X
+    
+  WHERE USED IN PROJECT:
+  - Enhanced backbone in modified architecture
+  - Improved receptive field for context understanding
+
+RESIDUAL CONNECTIONS (Skip Connections):
+  
+  WHAT:
+  Direct connection from input to output of a layer/block
+  Instead of: y = f(x)
+  Now: y = f(x) + x (element-wise addition)
+  
+  Benefits:
+  - Gradient flow in very deep networks
+  - Addresses vanishing gradient problem
+  - Enables training of networks with 100+ layers
+  - Empirically improves performance
+  
+  Example:
+    class ResidualBlock(nn.Module):
+        def __init__(self, channels):
+            super().__init__()
+            self.conv1 = nn.Conv2d(channels, channels, 3, padding=1)
+            self.bn1 = nn.BatchNorm2d(channels)
+            self.conv2 = nn.Conv2d(channels, channels, 3, padding=1)
+            self.bn2 = nn.BatchNorm2d(channels)
+        
+        def forward(self, x):
+            residual = x
+            out = self.conv1(x)
+            out = self.bn1(out)
+            out = nn.ReLU()(out)
+            out = self.conv2(out)
+            out = self.bn2(out)
+            out = out + residual  # Skip connection!
+            return out
+  
+  WHERE USED IN PROJECT:
+  - Enhanced FPN with residual connections
+  - Improved feature fusion
+
+ATTENTION MECHANISMS:
+
+Channel Attention (SE-Block):
+  
+  Process:
+  1. Global Average Pool: (B,C,H,W) -> (B,C,1,1)
+  2. FC layers with bottleneck (reduce to C/16, then back to C)
+  3. Sigmoid: Output weights between 0 and 1
+  4. Multiply with original features
+  
+  Purpose:
+  - Recalibrate channels
+  - Focus on disease-relevant feature channels
+  - Suppress irrelevant channels
+  
+  Example:
+    class ChannelAttention(nn.Module):
+        def __init__(self, channels, reduction=16):
+            super().__init__()
+            self.avg_pool = nn.AdaptiveAvgPool2d(1)
+            self.fc = nn.Sequential(
+                nn.Linear(channels, channels // reduction),
+                nn.ReLU(),
+                nn.Linear(channels // reduction, channels),
+                nn.Sigmoid()
+            )
+        
+        def forward(self, x):
+            b, c, _, _ = x.size()
+            y = self.avg_pool(x).view(b, c)
+            y = self.fc(y).view(b, c, 1, 1)
+            return x * y
+
+Spatial Attention:
+  
+  Process:
+  1. Channel-wise max and avg pooling
+  2. Concatenate to 2 channels
+  3. Conv 7x7 layer
+  4. Sigmoid: Output spatial weights
+  5. Multiply with original features
+  
+  Purpose:
+  - Focus on disease-affected regions
+  - Suppress irrelevant spatial areas
+  - Learn which image regions are important
+  
+  Example:
+    class SpatialAttention(nn.Module):
+        def __init__(self, kernel_size=7):
+            super().__init__()
+            self.conv = nn.Conv2d(2, 1, kernel_size, 
+                                  padding=kernel_size//2)
+            self.sigmoid = nn.Sigmoid()
+        
+        def forward(self, x):
+            avg = x.mean(dim=1, keepdim=True)
+            max_val, _ = x.max(dim=1, keepdim=True)
+            x_cat = torch.cat([avg, max_val], dim=1)
+            return x * self.sigmoid(self.conv(x_cat))
+
+FEATURE PYRAMID NETWORK (FPN):
+  
+  WHAT:
+  Multi-scale feature representation
+  Combines features from different scales
+  
+  Process:
+  1. Backbone extracts features at multiple scales
+  2. Top-down pathway: Upsample coarse features
+  3. Lateral connections: Merge coarse and fine features
+  4. Output: Multi-scale feature maps
+  
+  Purpose:
+  - Detect objects at different scales
+  - Small objects: Use fine-grained features
+  - Large objects: Use coarse features
+  - Efficient computation
+  
+  Example (Simplified):
+    class SimpleFPN(nn.Module):
+        def forward(self, features):
+            # features = [f_small, f_medium, f_large]
+            
+            # Upsample large to medium scale
+            large_up = upsample(features[2])
+            
+            # Add to medium features
+            medium = features[1] + large_up
+            
+            # Upsample to small scale
+            medium_up = upsample(medium)
+            small = features[0] + medium_up
+            
+            return [small, medium, features[2]]
+  
+  WHERE USED IN PROJECT:
+  - Enhanced FPN in modified architecture
+  - Better multi-scale feature extraction
+
+DECOUPLED DETECTION HEADS:
+  
+  WHAT:
+  Separate prediction branches for classification and localization
+  
+  Instead of:
+    features -> conv -> [class_logits, bbox_coords]
+  
+  Use:
+    features -> shared_conv
+             -> class_branch -> class_logits
+             -> bbox_branch -> bbox_coords
+  
+  Advantages:
+  - Task-specific feature learning
+  - Reduced gradient conflicts
+  - Better optimization for each task
+  
+  Example:
+    class DecoupledHead(nn.Module):
+        def __init__(self, in_channels, num_classes):
+            super().__init__()
+            
+            # Shared backbone
+            self.shared = nn.Sequential(
+                nn.Conv2d(in_channels, in_channels, 3, padding=1),
+                nn.ReLU()
+            )
+            
+            # Classification branch
+            self.cls = nn.Sequential(
+                nn.Conv2d(in_channels, in_channels, 3, padding=1),
+                nn.Conv2d(in_channels, num_classes, 1)
+            )
+            
+            # Regression branch
+            self.reg = nn.Sequential(
+                nn.Conv2d(in_channels, in_channels, 3, padding=1),
+                nn.Conv2d(in_channels, 4, 1)  # 4 bbox coords
+            )
+        
+        def forward(self, x):
+            shared = self.shared(x)
+            class_pred = self.cls(shared)
+            reg_pred = self.reg(shared)
+            return class_pred, reg_pred
+  
+  WHERE USED IN PROJECT:
+  - Modified architecture detection head
+  - Better separation of tasks
+
+================================================================================
+SECTION 4: TRAINING TECHNIQUES AND LOSS FUNCTIONS
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+4.1 Loss Functions
+────────────────────────────────────────────────────────────────────────────
+
+BINARY CROSS-ENTROPY (BCE):
+  
+  WHAT:
+  Loss for binary classification problems (yes/no, disease/no-disease)
+  
+  Formula:
+    BCE = -[y*log(p) + (1-y)*log(1-p)]
+    
+    y: Ground truth (0 or 1)
+    p: Predicted probability [0, 1]
+  
+  Interpretation:
+  - When y=1: Loss = -log(p), penalizes if prediction is < 1
+  - When y=0: Loss = -log(1-p), penalizes if prediction is > 0
+  
+  PyTorch:
+    loss_fn = nn.BCELoss()
+    loss = loss_fn(predictions, targets)
+    
+    OR with logits (numerical stability):
+    loss_fn = nn.BCEWithLogitsLoss()
+  
+  WHERE USED IN PROJECT:
+  - Classification loss (per class)
+  - Objectness loss (is there an object?)
+  - Attention sigmoid outputs
+
+INTERSECTION OVER UNION (IoU) BASED LOSS:
+  
+  IoU Definition:
+    IoU = |A ∩ B| / |A ∪ B|  (intersection / union)
+    Ranges from 0 to 1
+  
+  IoU Loss (Simple):
+    L_IoU = 1 - IoU
+    Minimizing this loss maximizes IoU
+  
+  CIoU (Complete IoU) - USED IN PROJECT:
+    Also penalizes:
+    - Center point distance
+    - Aspect ratio mismatch
+    
+    Better gradient flow than simple IoU
+    Better convergence
+  
+  PyTorch (using external library or custom):
+    # Custom implementation
+    def ciou_loss(boxes1, boxes2):
+        # Calculate IoU
+        inter = calculate_intersection(boxes1, boxes2)
+        union = calculate_union(boxes1, boxes2)
+        iou = inter / union
+        
+        # Calculate center distance
+        c = center_distance_squared(boxes1, boxes2)
+        d = diagonal_distance_squared(boxes1, boxes2)
+        
+        # Calculate aspect ratio difference
+        ar = aspect_ratio_penalty(boxes1, boxes2)
+        
+        # Combine
+        ciou = iou - (c/d) - ar
+        loss = 1 - ciou
+        return loss
+  
+  WHERE USED IN PROJECT:
+  - Bounding box regression loss
+  - Main component of detection loss
+
+────────────────────────────────────────────────────────────────────────────
+4.2 Optimization Techniques
+────────────────────────────────────────────────────────────────────────────
+
+SGD WITH MOMENTUM:
+  
+  WHAT:
+  Stochastic Gradient Descent with momentum
+  Accelerates convergence in relevant directions
+  
+  Update Rule (simplified):
+    v = momentum * v + gradient  # Velocity accumulation
+    weights -= lr * v
+  
+  Momentum (momentum=0.937 in YOLO):
+  - Accumulates gradient direction over steps
+  - Smooths noisy updates
+  - Helps escape shallow local minima
+  - High momentum (0.9+) = more acceleration
+  
+  PyTorch:
+    optimizer = torch.optim.SGD(
+        model.parameters(),
+        lr=0.001,
+        momentum=0.937,
+        weight_decay=0.0005
+    )
+  
+  WHERE USED IN PROJECT:
+  - Standard optimizer for YOLO
+  - Training loop in Kaggle notebook
+
+LEARNING RATE SCHEDULING:
+  
+  WHAT:
+  Changes learning rate during training
+  
+  Strategies:
+  
+  Constant:
+    lr = 0.001 (entire training)
+    Simple but suboptimal
+  
+  Step Decay:
+    Decrease lr by factor every N epochs
+    lr = lr * 0.1 at epoch 30, 60, etc.
+  
+  Cosine Annealing (USED IN PROJECT):
+    lr = lr_min + 0.5*(lr_max - lr_min)*(1 + cos(π*epoch/epochs))
+    
+    Smoothly decreases from max to min
+    Allows "jumping out" of minima late in training
+    Benefits:
+    - Smooth convergence
+    - Avoids sharp learning rate drops
+    - Standard practice in modern training
+  
+  Warm-up (USED IN PROJECT):
+    First 3-5 epochs: Gradually increase lr from 0
+    Reason: Stabilize initial training
+    Prevents wild gradient swings with bad initial weights
+  
+  PyTorch:
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=50  # Number of epochs
+    )
+    
+    for epoch in range(epochs):
+        train(...)
+        scheduler.step()  # Update lr
+
+WEIGHT DECAY (L2 REGULARIZATION):
+  
+  WHAT:
+  Adds penalty term to loss for large weights
+  
+  Loss = MainLoss + lambda * ||weights||²
+  
+  Effect:
+  - Prevents weights from growing too large
+  - Reduces overfitting
+  - Weight decay=0.0005 is standard
+  
+  PyTorch:
+    optimizer = torch.optim.SGD(
+        params,
+        lr=0.001,
+        weight_decay=0.0005  # L2 regularization strength
+    )
+
+GRADIENT CLIPPING:
+  
+  WHAT:
+  Limits maximum gradient norm
+  
+  Problem Addressed:
+  - Gradients can explode during training
+  - Causes numerical instability
+  - Loss becomes NaN
+  
+  Solution:
+  - If ||gradient|| > max_norm, scale down to max_norm
+  - Preserves direction, limits magnitude
+  
+  PyTorch:
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(
+        model.parameters(),
+        max_norm=10.0
+    )
+    optimizer.step()
+
+WHERE USED IN PROJECT:
+- All above used in Kaggle training notebook
+- Standard practices in YOLO training
+
+────────────────────────────────────────────────────────────────────────────
+4.3 Data Augmentation Techniques
+────────────────────────────────────────────────────────────────────────────
+
+MOSAIC AUGMENTATION:
+  
+  WHAT:
+  Combines 4 random images into 1 training sample
+  
+  Process:
+  1. Select 4 random images
+  2. Random place each in 2x2 grid
+  3. Random crop/scale each image
+  4. Combine bounding boxes from all 4
+  5. Single image with multiple objects
+  
+  Benefits:
+  - More objects per image → better batch efficiency
+  - Different scales and contexts
+  - Improves small object detection
+  - Standard in YOLO training
+  
+  Visual:
+    Image1        Image2
+    (top-left)    (top-right)
+    ─────────────────────
+    Image3        Image4
+    (bottom-left) (bottom-right)
+
+MIXUP:
+  
+  WHAT:
+  Blends two images: x = α*x1 + (1-α)*x2
+  Also blends labels: y = α*y1 + (1-α)*y2
+  
+  Alpha: Sampled from Beta(0.2, 0.2)
+  
+  Benefits:
+  - Smoother decision boundaries
+  - Prevents sharp overfitting
+  - Regularization effect
+  
+  Example:
+    # Training sample
+    if random() < 0.1:  # 10% probability
+        alpha = beta(0.2, 0.2)  # Random alpha
+        x_new = alpha * x1 + (1 - alpha) * x2
+        y_new = alpha * y1 + (1 - alpha) * y2
+
+GEOMETRIC TRANSFORMATIONS:
+  
+  Rotation:
+    Rotate image by ±15 degrees
+    Purpose: Handle different camera angles
+  
+  Perspective:
+    Shift viewpoint slightly
+    Purpose: Robustness to non-frontal views
+  
+  Scale:
+    Resize image 0.5x to 2.0x
+    Purpose: Handle zoom variation
+  
+  Translation:
+    Shift image ±10% in x,y
+    Purpose: Shift invariance
+  
+  Implementation:
+    import albumentations as A
+    transform = A.Compose([
+        A.Rotate(limit=15),
+        A.Perspective(scale=(0.05, 0.1)),
+        A.RandomScale(scale_limit=0.2),
+        A.Transpose(),
+    ])
+
+COLOR TRANSFORMATIONS:
+  
+  Brightness:
+    Multiply pixel values by 0.8-1.2
+    Purpose: Handle lighting variation
+  
+  Contrast:
+    Adjust image contrast ±20%
+    Purpose: Handle exposure variation
+  
+  Saturation:
+    Adjust color saturation ±20%
+    Purpose: Handle color variation
+  
+  Hue:
+    Shift color hue ±5%
+    Purpose: Subtle color variation
+  
+  Implementation:
+    transform = A.Compose([
+        A.RandomBrightnessContrast(p=0.5),
+        A.Hue(p=0.5),
+        A.Saturation(p=0.5),
+    ])
+
+WHERE USED IN PROJECT:
+- YOLO training (built into ultralytics)
+- Automatic in Kaggle notebook
+- Manually in preprocessing if needed
+
+════════════════════════════════════════════════════════════════════════════
+SECTION 5: EVALUATION AND METRICS
+════════════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────────
+5.1 Detection Metrics Implementation
+────────────────────────────────────────────────────────────────────────────
+
+IoU CALCULATION:
+
+def calculate_iou(box1, box2):
+    """
+    Calculate Intersection over Union
+    
+    box1, box2: [x1, y1, x2, y2] format
+    """
+    # Calculate intersection area
+    x_left = max(box1[0], box2[0])
+    y_top = max(box1[1], box2[1])
+    x_right = min(box1[2], box2[2])
+    y_bottom = min(box1[3], box2[3])
+    
+    if x_right < x_left or y_bottom < y_top:
+        return 0.0
+    
+    intersection = (x_right - x_left) * (y_bottom - y_top)
+    
+    # Calculate union area
+    box1_area = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    box2_area = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    union = box1_area + box2_area - intersection
+    
+    iou = intersection / union
+    return iou
+
+PRECISION AND RECALL:
+
+def calculate_precision_recall(predictions, ground_truth, iou_threshold=0.5):
+    """
+    predictions: List of detected boxes with confidence
+    ground_truth: List of true boxes
+    """
+    tp = 0
+    fp = 0
+    fn = 0
+    
+    for pred_box, conf in predictions:
+        matched = False
+        for gt_box in ground_truth:
+            iou = calculate_iou(pred_box, gt_box)
+            if iou >= iou_threshold:
+                tp += 1
+                matched = True
+                break
+        
+        if not matched:
+            fp += 1
+    
+    fn = len(ground_truth) - tp
+    
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    
+    return precision, recall
+
+NON-MAXIMUM SUPPRESSION (NMS):
+
+def nms(boxes, scores, iou_threshold=0.45):
+    """
+    Remove overlapping detections, keep highest confidence
+    
+    boxes: List of [x1, y1, x2, y2]
+    scores: Confidence for each box
+    iou_threshold: Remove if IoU > threshold
+    """
+    # Sort by score (descending)
+    order = np.argsort(scores)[::-1]
+    
+    keep = []
+    while len(order) > 0:
+        i = order[0]
+        keep.append(i)
+        
+        if len(order) == 1:
+            break
+        
+        # Calculate IoU with remaining boxes
+        ious = np.array([
+            calculate_iou(boxes[i], boxes[j])
+            for j in order[1:]
+        ])
+        
+        # Keep only boxes with IoU < threshold
+        order = order[1:][ious < iou_threshold]
+    
+    return keep
+
+MEAN AVERAGE PRECISION (mAP):
+
+def calculate_ap(precisions, recalls):
+    """
+    Calculate Area Under Precision-Recall Curve
+    """
+    # Ensure starting from (0, 0)
+    precisions = [0] + precisions + [0]
+    recalls = [0] + recalls + [1]
+    
+    # Calculate area under curve
+    ap = 0
+    for i in range(len(recalls) - 1):
+        # Use maximum precision for monotonic interpolation
+        p = max(precisions[i:])
+        ap += p * (recalls[i+1] - recalls[i])
+    
+    return ap
+
+WHERE USED:
+- Evaluation metrics calculation
+- Performance comparison
+- Validation during training
+
+================================================================================
+SECTION 6: PROJECT-SPECIFIC FUNCTIONS AND WORKFLOWS
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+6.1 Data Loading and Preprocessing
+────────────────────────────────────────────────────────────────────────────
+
+LETTERBOX RESIZING:
+
+def letterbox(img, new_shape=(640, 640), color=(114, 114, 114)):
+    """
+    Resize image preserving aspect ratio with padding
+    
+    Purpose:
+    - Maintain original proportions
+    - No distortion
+    - No information loss
+    - Standard YOLO preprocessing
+    """
+    h, w = img.shape[:2]
+    r = min(new_shape[0]/h, new_shape[1]/w)  # Scale ratio
+    
+    # New unpadded size
+    new_h, new_w = int(h*r), int(w*r)
+    
+    # Resize
+    img = cv2.resize(img, (new_w, new_h))
+    
+    # Add padding
+    dh = (new_shape[0] - new_h) // 2
+    dw = (new_shape[1] - new_w) // 2
+    
+    img = cv2.copyMakeBorder(
+        img, dh, new_shape[0]-new_h-dh,
+        dw, new_shape[1]-new_w-dw,
+        cv2.BORDER_CONSTANT, value=color
+    )
+    
+    return img
+
+YOLO FORMAT CONVERSION:
+
+def bbox_xyxy_to_xywh(bbox):
+    """
+    Convert [x1,y1,x2,y2] to [cx,cy,w,h] (YOLO format)
+    """
+    x1, y1, x2, y2 = bbox
+    cx = (x1 + x2) / 2
+    cy = (y1 + y2) / 2
+    w = x2 - x1
+    h = y2 - y1
+    return [cx, cy, w, h]
+
+def bbox_xywh_to_xyxy(bbox):
+    """
+    Convert [cx,cy,w,h] to [x1,y1,x2,y2]
+    """
+    cx, cy, w, h = bbox
+    x1 = cx - w/2
+    y1 = cy - h/2
+    x2 = cx + w/2
+    y2 = cy + h/2
+    return [x1, y1, x2, y2]
+
+YOLO ANNOTATION PARSING:
+
+def load_yolo_annotation(txt_file, img_width, img_height):
+    """
+    Load YOLO format annotation
+    Returns boxes in pixel coordinates
+    """
+    boxes = []
+    with open(txt_file, 'r') as f:
+        for line in f:
+            parts = line.strip().split()
+            class_id = int(parts[0])
+            
+            # Normalized coordinates
+            cx, cy, w, h = [float(x) for x in parts[1:]]
+            
+            # Convert to pixel coordinates
+            x1 = int((cx - w/2) * img_width)
+            y1 = int((cy - h/2) * img_height)
+            x2 = int((cx + w/2) * img_width)
+            y2 = int((cy + h/2) * img_height)
+            
+            boxes.append({
+                'class': class_id,
+                'bbox': [x1, y1, x2, y2]
+            })
+    
+    return boxes
+
+WHERE USED:
+- Kaggle notebook dataset preparation
+- Local inference preprocessing
+
+────────────────────────────────────────────────────────────────────────────
+6.2 Model Training Loop
+────────────────────────────────────────────────────────────────────────────
+
+TRAINING LOOP PSEUDOCODE:
+
+for epoch in range(num_epochs):
+    # Training phase
+    model.train()  # Enable training mode
+    
+    for batch_idx, (images, targets) in enumerate(train_loader):
+        # Move to device (GPU)
+        images = images.to(device)
+        targets = targets.to(device)
+        
+        # Forward pass
+        outputs = model(images)
+        
+        # Calculate loss
+        loss = criterion(outputs, targets)
+        
+        # Backward pass
+        optimizer.zero_grad()  # Clear gradients
+        loss.backward()  # Compute gradients
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)  # Clip
+        optimizer.step()  # Update weights
+        
+        # Logging
+        if batch_idx % 100 == 0:
+            print(f"Epoch {epoch} Loss: {loss.item():.4f}")
+    
+    # Validation phase
+    model.eval()  # Disable training mode
+    
+    with torch.no_grad():  # No gradient computation
+        val_metrics = evaluate(model, val_loader)
+    
+    print(f"Epoch {epoch} Val mAP: {val_metrics['mAP']:.4f}")
+    
+    # Update learning rate
+    scheduler.step()
+    
+    # Early stopping
+    if val_metrics['mAP'] > best_mAP:
+        best_mAP = val_metrics['mAP']
+        save_checkpoint(model, f'best_epoch_{epoch}.pt')
+    else:
+        patience_counter += 1
+        if patience_counter >= patience:
+            break
+
+WHERE USED:
+- Kaggle training notebook main training section
+
+────────────────────────────────────────────────────────────────────────────
+6.3 Inference Pipeline
+────────────────────────────────────────────────────────────────────────────
+
+INFERENCE WORKFLOW:
+
+def inference_single_image(model, image_path, conf_threshold=0.25):
+    """
+    Complete inference pipeline for single image
+    """
+    # 1. Load image
+    image = cv2.imread(image_path)
+    original_shape = image.shape
+    
+    # 2. Preprocess
+    input_tensor = preprocess_image(image)
+    input_tensor = input_tensor.unsqueeze(0).to(device)
+    
+    # 3. Forward pass
+    with torch.no_grad():
+        predictions = model(input_tensor)
+    
+    # 4. Parse predictions
+    detections = []
+    for pred in predictions:
+        if pred['conf'] > conf_threshold:
+            # Convert normalized coords to pixel coords
+            bbox = denormalize_bbox(pred['bbox'], original_shape)
+            detections.append({
+                'class': class_names[pred['class']],
+                'confidence': pred['conf'],
+                'bbox': bbox
+            })
+    
+    # 5. Apply NMS
+    detections = nms(detections, iou_threshold=0.45)
+    
+    return detections
+
+WHERE USED:
+- Local inference script main function
+- Kaggle notebook validation
+
+================================================================================
+SECTION 7: COMMAND-LINE INTERFACE AND ARGUMENT HANDLING
+================================================================================
+
+argparse USAGE:
+
+import argparse
+
+def create_parser():
+    parser = argparse.ArgumentParser(
+        description='CADI-AI Modified YOLO Inference',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+        python script.py --weights model.pt --image test.jpg
+        python script.py --weights model.pt --image_dir images/ --save_dir results/
+        """
+    )
+    
+    # Required arguments
+    parser.add_argument('--weights', type=str, required=True,
+                       help='Path to model weights')
+    
+    # Optional arguments with types
+    parser.add_argument('--image', type=str, default=None,
+                       help='Path to single image')
+    parser.add_argument('--conf_threshold', type=float, default=0.25,
+                       help='Confidence threshold (0-1)')
+    parser.add_argument('--batch_size', type=int, default=16,
+                       help='Batch size for processing')
+    
+    # Boolean flags
+    parser.add_argument('--eval', action='store_true',
+                       help='Run evaluation mode')
+    parser.add_argument('--visualize', action='store_true',
+                       help='Display results')
+    
+    # Choice arguments
+    parser.add_argument('--device', type=str, choices=['cuda', 'cpu'],
+                       default='cuda')
+    
+    return parser
+
+# Parse arguments
+args = create_parser().parse_args()
+
+# Access arguments
+print(args.weights)
+print(args.conf_threshold)
+if args.eval:
+    print("Running in evaluation mode")
+
+WHERE USED:
+- Local inference script
+- Command-line argument parsing
+
+================================================================================
+SECTION 8: COMPLETE WORKFLOW SUMMARY
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+8.1 Training Workflow (Kaggle)
+────────────────────────────────────────────────────────────────────────────
+
+1. SETUP
+   - Import libraries (torch, ultralytics, cv2, etc.)
+   - Check GPU availability
+   - Set random seeds
+   - Create directories
+
+2. DATASET PREPARATION
+   - Load CADI-AI dataset
+   - Explore structure
+   - Prepare YOLO format (if needed)
+   - Create data.yaml
+   - Stratified train/val split
+
+3. BASELINE EVALUATION
+   - Load YOLOv8m pretrained
+   - Evaluate on dataset (no training)
+   - Record baseline metrics
+
+4. TRAINING
+   - Load/initialize modified model
+   - Set up optimizer (SGD with momentum)
+   - Set up learning rate scheduler (cosine annealing)
+   - Training loop (50 epochs):
+     * Training phase: Forward, backward, update
+     * Validation phase: Evaluate metrics
+     * Early stopping check
+     * Save best model
+
+5. RESULTS
+   - Plot training curves
+   - Save metrics to JSON
+   - Generate comparison tables
+   - Create summary report
+
+6. SAVE OUTPUTS
+   - Model weights (best.pt)
+   - Training metrics (JSON)
+   - Plots and visualizations
+   - Text summary
+
+────────────────────────────────────────────────────────────────────────────
+8.2 Inference Workflow (Local PC)
+────────────────────────────────────────────────────────────────────────────
+
+1. INITIALIZATION
+   - Load model weights
+   - Set device (cuda/cpu)
+   - Load class names
+   - Prepare input parameters
+
+2. SINGLE IMAGE INFERENCE
+   - Load image from file
+   - Preprocess (letterbox, normalize)
+   - Forward pass through model
+   - Parse predictions
+   - Apply NMS (non-maximum suppression)
+   - Denormalize coordinates
+   - Save/display results
+
+3. BATCH INFERENCE
+   - Iterate through image directory
+   - Run inference on each image
+   - Collect results
+   - Save annotated images
+   - Save results to JSON
+
+4. EVALUATION
+   - Load dataset with annotations
+   - Run inference on all images
+   - Calculate metrics:
+     * mAP@0.5, mAP@0.5:0.95
+     * Precision, Recall per class
+     * F1-scores
+     * Confusion matrix
+
+5. COMPARISON
+   - Load baseline metrics
+   - Load modified model metrics
+   - Create comparison plots
+   - Generate comparison report
+   - Calculate improvements
+
+6. OUTPUT
+   - Save annotated images
+   - Save results JSON
+   - Generate plots
+   - Create comparison table
+
+════════════════════════════════════════════════════════════════════════════
+SECTION 9: PRACTICAL TIPS AND BEST PRACTICES
+════════════════════════════════════════════════════════════════════════════
+
+DEBUGGING COMMON ISSUES:
+
+1. Out of Memory (OOM)
+   Problem: CUDA out of memory error
+   Solution:
+   - Reduce batch size (16 → 8)
+   - Reduce image size (640 → 512)
+   - Use smaller model (yolov8m → yolov8s)
+   - Clear GPU cache: torch.cuda.empty_cache()
+
+2. NaN Loss
+   Problem: Loss becomes NaN during training
+   Solution:
+   - Reduce learning rate
+   - Use gradient clipping (already done)
+   - Check data for invalid values
+   - Use mixed precision training
+
+3. Poor Accuracy
+   Problem: Model not learning
+   Solution:
+   - Increase training epochs
+   - Check data augmentation
+   - Verify data loading (labels correct)
+   - Try higher learning rate
+   - Use learning rate scheduler
+
+4. Slow Training
+   Problem: Training takes very long
+   Solution:
+   - Reduce image size
+   - Use smaller batch (faster iteration)
+   - Use mixed precision
+   - Use distributed training (multiple GPUs)
+
+PERFORMANCE OPTIMIZATION:
+
+1. Faster Inference
+   - Quantization (8-bit weights)
+   - Model compression
+   - Batch processing (process multiple images together)
+   - Remove unnecessary preprocessing
+
+2. Lower Memory Usage
+   - Gradient accumulation
+   - Mixed precision (FP16)
+   - Model pruning
+   - Knowledge distillation
+
+3. Better Accuracy
+   - Larger model
+   - More training data
+   - Better augmentation
+   - Ensemble of models
+
+════════════════════════════════════════════════════════════════════════════
+END OF DOCUMENTATION
+════════════════════════════════════════════════════════════════════════════
+
+This comprehensive guide covers:
+✓ Every library and its usage
+✓ All neural network components
+✓ Training techniques and optimization
+✓ Evaluation metrics
+✓ Project-specific functions
+✓ Complete workflows
+✓ Practical tips
+
+Use this as reference while implementing and understanding the project.

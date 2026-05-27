@@ -1,0 +1,20 @@
+# Virtual Environment
+env/
+
+# YOLO Weights
+weights/
+*.pt
+
+# Training Outputs
+runs/
+
+# Cache
+__pycache__/
+*.pyc
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

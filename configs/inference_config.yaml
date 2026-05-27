@@ -1,0 +1,21 @@
+# CADI-AI Inference Configuration
+
+model:
+  weights: "weights/modified_yolo_best.pt"
+  input_size: 640
+  confidence_threshold: 0.25
+  iou_threshold: 0.45
+
+classes:
+  0: "abiotic"
+  1: "insect"
+  2: "disease"
+
+inference:
+  batch_size: 1
+  device: "auto"  # auto, cuda, cpu
+
+paths:
+  images: "images/"
+  results: "results/"
+  configs: "configs/"

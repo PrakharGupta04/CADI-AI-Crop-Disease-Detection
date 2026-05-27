@@ -1,0 +1,9 @@
+names:
+- abiotic
+- insect
+- disease
+nc: 3
+path: C:\Users\praba\OneDrive\Desktop\DL\data
+test: images/val
+train: images/train
+val: images/val
